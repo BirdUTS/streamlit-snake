@@ -5,8 +5,9 @@ from streamlit_autorefresh import st_autorefresh
 BOARD_SIZE = 15
 
 st.set_page_config(page_title="Snake", page_icon="🐍", layout="centered")
-st.title("🐍 Streamlit Snake (Auto Move)")
+st.title("🐍 Streamlit Snake (Auto Move) v2")
 st.caption("Snake moves automatically. Use direction buttons to steer.")
+st.write("Version: auto-v2")
 
 
 def spawn_apple(snake):
