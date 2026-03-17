@@ -1,20 +1,12 @@
 import random
 import streamlit as st
+from streamlit_autorefresh import st_autorefresh
 
 BOARD_SIZE = 15
 
 st.set_page_config(page_title="Snake", page_icon="🐍", layout="centered")
-st.title("🐍 Streamlit Snake")
-st.caption("Use W A S D buttons (or arrow buttons) to move. Eat apples 🍎 and avoid walls/self.")
-
-
-def init_game():
-    center = BOARD_SIZE // 2
-    st.session_state.snake = [(center, center), (center, center - 1), (center, center - 2)]
-    st.session_state.direction = (0, 1)  # moving right
-    st.session_state.apple = spawn_apple(st.session_state.snake)
-    st.session_state.score = 0
-    st.session_state.game_over = False
+st.title("🐍 Streamlit Snake (Auto Move)")
+st.caption("Snake moves automatically. Use direction buttons to steer.")
 
 
 def spawn_apple(snake):
@@ -22,34 +14,43 @@ def spawn_apple(snake):
     return random.choice(empty) if empty else None
 
 
-def step_game(new_direction=None):
-    if st.session_state.game_over:
-        return
+def init_game():
+    center = BOARD_SIZE // 2
+    st.session_state.snake = [(center, center), (center, center - 1), (center, center - 2)]
+    st.session_state.direction = (0, 1)
+    st.session_state.apple = spawn_apple(st.session_state.snake)
+    st.session_state.score = 0
+    st.session_state.game_over = False
+    st.session_state.running = True
 
-    if new_direction:
-        # prevent instant reverse
-        dr, dc = st.session_state.direction
-        nr, nc = new_direction
-        if (dr + nr, dc + nc) != (0, 0):
-            st.session_state.direction = new_direction
+
+def set_direction(new_direction):
+    dr, dc = st.session_state.direction
+    nr, nc = new_direction
+    if (dr + nr, dc + nc) != (0, 0):
+        st.session_state.direction = new_direction
+
+
+def step_game():
+    if st.session_state.game_over or not st.session_state.running:
+        return
 
     head_r, head_c = st.session_state.snake[0]
     dr, dc = st.session_state.direction
     new_head = (head_r + dr, head_c + dc)
 
-    # wall hit
     if not (0 <= new_head[0] < BOARD_SIZE and 0 <= new_head[1] < BOARD_SIZE):
         st.session_state.game_over = True
+        st.session_state.running = False
         return
 
-    # self hit
     if new_head in st.session_state.snake:
         st.session_state.game_over = True
+        st.session_state.running = False
         return
 
     st.session_state.snake.insert(0, new_head)
 
-    # apple
     if st.session_state.apple and new_head == st.session_state.apple:
         st.session_state.score += 1
         st.session_state.apple = spawn_apple(st.session_state.snake)
@@ -66,11 +67,11 @@ def render_board():
         for c in range(BOARD_SIZE):
             cell = (r, c)
             if cell == st.session_state.snake[0]:
-                color = "#2E7D32"  # head
+                color = "#2E7D32"
             elif cell in snake:
-                color = "#66BB6A"  # body
+                color = "#66BB6A"
             elif cell == apple:
-                color = "#E53935"  # apple
+                color = "#E53935"
             else:
                 color = "#ECEFF1"
             html += f'<div style="width:24px;height:24px;border-radius:4px;background:{color};border:1px solid #CFD8DC;"></div>'
@@ -81,39 +82,46 @@ def render_board():
 if "snake" not in st.session_state:
     init_game()
 
-col1, col2, col3 = st.columns([1, 1, 1])
-with col2:
-    up = st.button("⬆️ W", use_container_width=True)
+# Controls
+speed_ms = st.slider("Speed (ms per step)", min_value=80, max_value=500, value=180, step=20)
 
-left_col, mid_col, right_col = st.columns([1, 1, 1])
-with left_col:
-    left = st.button("⬅️ A", use_container_width=True)
-with mid_col:
-    down = st.button("⬇️ S", use_container_width=True)
-with right_col:
-    right = st.button("➡️ D", use_container_width=True)
+c1, c2, c3 = st.columns([1, 1, 1])
+with c1:
+    if st.button("▶️ Start", use_container_width=True):
+        if not st.session_state.game_over:
+            st.session_state.running = True
+with c2:
+    if st.button("⏸️ Pause", use_container_width=True):
+        st.session_state.running = False
+with c3:
+    if st.button("🔄 Restart", use_container_width=True):
+        init_game()
+        st.rerun()
+
+u1, u2, u3 = st.columns([1, 1, 1])
+with u2:
+    if st.button("⬆️", use_container_width=True):
+        set_direction((-1, 0))
+
+m1, m2, m3 = st.columns([1, 1, 1])
+with m1:
+    if st.button("⬅️", use_container_width=True):
+        set_direction((0, -1))
+with m3:
+    if st.button("➡️", use_container_width=True):
+        set_direction((0, 1))
+
+l1, l2, l3 = st.columns([1, 1, 1])
+with l2:
+    if st.button("⬇️", use_container_width=True):
+        set_direction((1, 0))
+
+if st.session_state.running and not st.session_state.game_over:
+    st_autorefresh(interval=speed_ms, key="snake-tick")
+    step_game()
 
 st.write(f"**Score:** {st.session_state.score}")
-
-if up:
-    step_game((-1, 0))
-elif down:
-    step_game((1, 0))
-elif left:
-    step_game((0, -1))
-elif right:
-    step_game((0, 1))
-
 render_board()
 
 if st.session_state.game_over:
-    st.error("Game Over! 💥")
-    if st.button("Restart"):
-        init_game()
-        st.rerun()
-else:
-    if st.button("Step Forward"):
-        step_game()
-        st.rerun()
-
-st.info("Tip: Press Step Forward repeatedly to keep moving, or change direction with buttons.")
+    st.error("Game Over! 💥 Press Restart to play again.")
